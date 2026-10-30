@@ -25,12 +25,13 @@ class AvatarView @JvmOverloads constructor(
     }
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 12f
+        strokeWidth = 14f
     }
 
     private var rotationAngle = 0f
-    private var pulseScale = 1.0f
+    private var reverseRotationAngle = 360f
     private var currentState = State.IDLE
+    private var isUsingChannelLogo = false
 
     enum class State {
         IDLE, LISTENING, THINKING, SPEAKING
@@ -38,6 +39,7 @@ class AvatarView @JvmOverloads constructor(
 
     init {
         setWillNotDraw(false)
+        cameraDistance = 8000f
 
         imageView = ImageView(context).apply {
             setImageResource(R.drawable.avatar_anime)
@@ -49,27 +51,43 @@ class AvatarView @JvmOverloads constructor(
         }
         addView(imageView)
 
+        // Tap avatar to toggle between Anime Boy and Channel Logo
+        setOnClickListener {
+            toggleAvatarImage()
+        }
+
         startAnimations()
     }
 
+    private fun toggleAvatarImage() {
+        isUsingChannelLogo = !isUsingChannelLogo
+        val targetRes = if (isUsingChannelLogo) R.drawable.channel_logo else R.drawable.avatar_anime
+        imageView.animate().alpha(0f).scaleX(0.7f).scaleY(0.7f).setDuration(200).withEndAction {
+            imageView.setImageResource(targetRes)
+            imageView.animate().alpha(1f).scaleX(1.0f).scaleY(1.0f).setDuration(250).start()
+        }.start()
+    }
+
     private fun startAnimations() {
-        // Continuous HUD ring rotation
+        // Continuous HUD outer ring rotation
         ValueAnimator.ofFloat(0f, 360f).apply {
-            duration = 10000
+            duration = 8000
             repeatCount = ValueAnimator.INFINITE
             interpolator = LinearInterpolator()
             addUpdateListener {
                 rotationAngle = it.animatedValue as Float
+                reverseRotationAngle = 360f - rotationAngle
                 invalidate()
             }
             start()
         }
 
-        // Gentle breathing animation for the character
-        val scaleX = PropertyValuesHolder.ofFloat("scaleX", 0.97f, 1.03f)
-        val scaleY = PropertyValuesHolder.ofFloat("scaleY", 0.97f, 1.03f)
-        ObjectAnimator.ofPropertyValuesHolder(imageView, scaleX, scaleY).apply {
-            duration = 2400
+        // 3D Parallax Depth Tilt & Breathing animation
+        val tiltY = PropertyValuesHolder.ofFloat("rotationY", -8f, 8f)
+        val scaleX = PropertyValuesHolder.ofFloat("scaleX", 0.96f, 1.04f)
+        val scaleY = PropertyValuesHolder.ofFloat("scaleY", 0.96f, 1.04f)
+        ObjectAnimator.ofPropertyValuesHolder(imageView, tiltY, scaleX, scaleY).apply {
+            duration = 2600
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.REVERSE
             interpolator = AccelerateDecelerateInterpolator()
@@ -81,16 +99,17 @@ class AvatarView @JvmOverloads constructor(
         currentState = state
         when (state) {
             State.IDLE -> {
-                imageView.animate().scaleX(1.0f).scaleY(1.0f).setDuration(300).start()
+                imageView.animate().scaleX(1.0f).scaleY(1.0f).translationY(0f).setDuration(300).start()
             }
             State.LISTENING -> {
-                imageView.animate().scaleX(1.06f).scaleY(1.06f).setDuration(250).start()
+                imageView.animate().scaleX(1.08f).scaleY(1.08f).translationY(-8f).setDuration(200).start()
             }
             State.THINKING -> {
-                imageView.animate().scaleX(0.98f).scaleY(0.98f).setDuration(250).start()
+                imageView.animate().scaleX(0.96f).scaleY(0.96f).translationY(4f).setDuration(200).start()
             }
             State.SPEAKING -> {
-                imageView.animate().scaleX(1.08f).scaleY(1.08f).setDuration(200).start()
+                // 3D Talking bounce animation
+                imageView.animate().scaleX(1.12f).scaleY(1.12f).translationY(-12f).setDuration(160).start()
             }
         }
         invalidate()
@@ -111,15 +130,14 @@ class AvatarView @JvmOverloads constructor(
         }
         val mainColor = Color.parseColor(colorHex)
 
-        // Outer glow ring
+        // Outer glow
         glowPaint.color = Color.argb(45, Color.red(mainColor), Color.green(mainColor), Color.blue(mainColor))
         canvas.drawCircle(cx, cy, radius, glowPaint)
 
-        // Segmented HUD arc ring
+        // Outer rotating HUD segments
         ringPaint.color = mainColor
         canvas.save()
         canvas.rotate(rotationAngle, cx, cy)
-
         val rect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
         val segmentCount = 6
         val sweepAngle = 360f / segmentCount
@@ -128,5 +146,21 @@ class AvatarView @JvmOverloads constructor(
             canvas.drawArc(rect, startAngle, sweepAngle - 16f, false, ringPaint)
         }
         canvas.restore()
+
+        // Inner counter-rotating ring
+        val innerRadius = radius - 16f
+        if (innerRadius > 0) {
+            canvas.save()
+            canvas.rotate(reverseRotationAngle, cx, cy)
+            val innerRect = RectF(cx - innerRadius, cy - innerRadius, cx + innerRadius, cy + innerRadius)
+            val innerSegments = 4
+            val innerSweep = 360f / innerSegments
+            ringPaint.color = Color.argb(120, Color.red(mainColor), Color.green(mainColor), Color.blue(mainColor))
+            for (i in 0 until innerSegments) {
+                val start = i * innerSweep + 12f
+                canvas.drawArc(innerRect, start, innerSweep - 24f, false, ringPaint)
+            }
+            canvas.restore()
+        }
     }
 }

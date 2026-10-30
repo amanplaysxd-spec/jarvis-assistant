@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bubbleRoot"
+    android:layout_width="72dp"
+    android:layout_height="72dp"
+    android:background="@drawable/arc_reactor_bg"
+    android:padding="6dp">
+
+    <!-- Channel Logo / Avatar -->
+    <ImageView
+        android:id="@+id/ivBubbleAvatar"
+        android:layout_width="54dp"
+        android:layout_height="54dp"
+        android:layout_gravity="center"
+        android:src="@drawable/channel_logo"
+        android:scaleType="centerCrop" />
+
+    <!-- Dismiss close 'X' badge -->
+    <ImageView
+        android:id="@+id/btnBubbleClose"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_gravity="top|end"
+        android:background="@drawable/bg_glass_card"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:tint="@color/neon_red"
+        android:contentDescription="Close Bubble" />
+
+</FrameLayout>

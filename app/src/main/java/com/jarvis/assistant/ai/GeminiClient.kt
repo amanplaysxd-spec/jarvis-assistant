@@ -7,22 +7,25 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
 class GeminiClient(
     private var apiKey: String,
-    private var model: String = "gemini-3.8-flash"
+    private var model: String = "gemini-1.5-flash"
 ) {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
+        .writeTimeout(25, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
-    private val gson = Gson()
     private val mediaType = "application/json; charset=utf-8".toMediaType()
 
     fun updateApiKey(newKey: String) {
-        apiKey = newKey
+        apiKey = newKey.trim().replace("\"", "").replace("'", "")
     }
 
     fun updateModel(newModel: String) {
@@ -34,15 +37,88 @@ class GeminiClient(
         systemInstruction: String,
         chatHistory: List<Pair<String, String>> = emptyList()
     ): GeminiResponse = withContext(Dispatchers.IO) {
-        if (apiKey.isBlank()) {
+        val cleanKey = apiKey.trim().replace("\"", "").replace("'", "")
+        if (cleanKey.isBlank()) {
             return@withContext GeminiResponse(
-                text = "Boss, please set your Google Gemini API Key in Settings first.",
+                text = "Boss, please set your Google Gemini API Key in Settings (gear icon) first.",
                 functionCall = null
             )
         }
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        // Resolving model name: 1.5-flash is universal and stable across all Google AI Studio accounts
+        val targetModel = when (model) {
+            "gemini-3.8-flash", "gemini-2.0-flash" -> "gemini-1.5-flash"
+            else -> model
+        }
 
+        val requestBody = buildRequestBody(userMessage, systemInstruction, chatHistory)
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$cleanKey"
+
+        // Execute with automatic retry and 404/timeout recovery
+        try {
+            executeRequest(url, requestBody, cleanKey, targetModel)
+        } catch (e: SocketTimeoutException) {
+            // Automatic retry once on timeout (helps on 5G network latency spikes)
+            try {
+                executeRequest(url, requestBody, cleanKey, targetModel)
+            } catch (retryErr: Exception) {
+                GeminiResponse(
+                    text = "Network connection is slow, Boss. Please try again or check your mobile data/Wi-Fi.",
+                    functionCall = null
+                )
+            }
+        } catch (e: Exception) {
+            GeminiResponse(
+                text = "Connection error: ${e.localizedMessage ?: "Unknown error"}",
+                functionCall = null
+            )
+        }
+    }
+
+    private fun executeRequest(
+        url: String,
+        requestBody: String,
+        cleanKey: String,
+        targetModel: String
+    ): GeminiResponse {
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody.toRequestBody(mediaType))
+            .build()
+
+        var response = client.newCall(request).execute()
+        var responseBody = response.body?.string()
+
+        // 404 Fallback: If target model returned 404, fallback to gemini-1.5-flash immediately
+        if (response.code == 404 && targetModel != "gemini-1.5-flash") {
+            val fallbackUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanKey"
+            val fallbackReq = Request.Builder()
+                .url(fallbackUrl)
+                .post(requestBody.toRequestBody(mediaType))
+                .build()
+            response = client.newCall(fallbackReq).execute()
+            responseBody = response.body?.string()
+        }
+
+        if (!response.isSuccessful || responseBody == null) {
+            val errorMsg = when (response.code) {
+                400 -> "API Key is invalid or restricted. Please verify your key in Settings."
+                403 -> "API Key lacks permissions. Please generate a new key on Google AI Studio."
+                404 -> "Model unavailable. Jarvis will auto-switch models on next query."
+                429 -> "Rate limit reached. Please wait a few moments, Boss."
+                else -> "API response error (${response.code})."
+            }
+            return GeminiResponse(text = errorMsg, functionCall = null)
+        }
+
+        return parseGeminiResponse(responseBody)
+    }
+
+    private fun buildRequestBody(
+        userMessage: String,
+        systemInstruction: String,
+        chatHistory: List<Pair<String, String>>
+    ): String {
         val rootJson = JsonObject()
 
         // System Instruction
@@ -54,9 +130,8 @@ class GeminiClient(
         sysObj.add("parts", sysParts)
         rootJson.add("system_instruction", sysObj)
 
-        // Contents (History + Latest user message)
+        // Conversation history
         val contentsArray = JsonArray()
-
         for ((role, text) in chatHistory.takeLast(6)) {
             val historyTurn = JsonObject()
             historyTurn.addProperty("role", if (role == "user") "user" else "model")
@@ -79,33 +154,10 @@ class GeminiClient(
 
         rootJson.add("contents", contentsArray)
 
-        // Tools Declaration
+        // Tools / Function declarations
         rootJson.add("tools", createToolsDeclaration())
 
-        val requestBody = rootJson.toString().toRequestBody(mediaType)
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody)
-            .build()
-
-        try {
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (!response.isSuccessful || responseBody == null) {
-                return@withContext GeminiResponse(
-                    text = "API error (${response.code}). Please verify your Gemini API key.",
-                    functionCall = null
-                )
-            }
-
-            parseGeminiResponse(responseBody)
-        } catch (e: Exception) {
-            GeminiResponse(
-                text = "Connection error: ${e.localizedMessage ?: "Unknown error"}",
-                functionCall = null
-            )
-        }
+        return rootJson.toString()
     }
 
     private fun parseGeminiResponse(jsonString: String): GeminiResponse {
@@ -159,13 +211,13 @@ class GeminiClient(
         // 1. open_app
         funcArray.add(JsonObject().apply {
             addProperty("name", "open_app")
-            addProperty("description", "Opens an installed app or game on the phone, such as Minecraft, ChatGPT, WhatsApp, Camera, etc.")
+            addProperty("description", "Opens an installed app or game on the phone, such as Minecraft, Free Fire, ChatGPT, YouTube, Camera, WhatsApp, etc.")
             add("parameters", JsonObject().apply {
                 addProperty("type", "OBJECT")
                 add("properties", JsonObject().apply {
                     add("app_name", JsonObject().apply {
                         addProperty("type", "STRING")
-                        addProperty("description", "Name of the app/game to open (e.g. minecraft, chatgpt, settings)")
+                        addProperty("description", "Name of the app/game to open (e.g. minecraft, free fire, chatgpt, settings)")
                     })
                 })
                 add("required", JsonArray().apply { add("app_name") })
@@ -188,7 +240,59 @@ class GeminiClient(
             })
         })
 
-        // 3. generate_image
+        // 3. upload_youtube_video
+        funcArray.add(JsonObject().apply {
+            addProperty("name", "upload_youtube_video")
+            addProperty("description", "Opens YouTube upload screen to publish a video with title and description.")
+            add("parameters", JsonObject().apply {
+                addProperty("type", "OBJECT")
+                add("properties", JsonObject().apply {
+                    add("title", JsonObject().apply {
+                        addProperty("type", "STRING")
+                        addProperty("description", "Video title")
+                    })
+                    add("description", JsonObject().apply {
+                        addProperty("type", "STRING")
+                        addProperty("description", "Video description")
+                    })
+                })
+                add("required", JsonArray().apply { add("title") })
+            })
+        })
+
+        // 4. perform_gesture
+        funcArray.add(JsonObject().apply {
+            addProperty("name", "perform_gesture")
+            addProperty("description", "Performs directional movement, swipe, or tap gesture on screen to control games or scroll.")
+            add("parameters", JsonObject().apply {
+                addProperty("type", "OBJECT")
+                add("properties", JsonObject().apply {
+                    add("direction", JsonObject().apply {
+                        addProperty("type", "STRING")
+                        addProperty("description", "Direction: up, down, left, right, jump, tap, click")
+                    })
+                })
+                add("required", JsonArray().apply { add("direction") })
+            })
+        })
+
+        // 5. click_screen_text
+        funcArray.add(JsonObject().apply {
+            addProperty("name", "click_screen_text")
+            addProperty("description", "Finds and clicks any button or element on the current screen by its visible text.")
+            add("parameters", JsonObject().apply {
+                addProperty("type", "OBJECT")
+                add("properties", JsonObject().apply {
+                    add("text", JsonObject().apply {
+                        addProperty("type", "STRING")
+                        addProperty("description", "The button or label text to click on")
+                    })
+                })
+                add("required", JsonArray().apply { add("text") })
+            })
+        })
+
+        // 6. generate_image
         funcArray.add(JsonObject().apply {
             addProperty("name", "generate_image")
             addProperty("description", "Opens ChatGPT or AI image generator with the user prompt to make an image.")
@@ -204,7 +308,7 @@ class GeminiClient(
             })
         })
 
-        // 4. remember_fact
+        // 7. remember_fact
         funcArray.add(JsonObject().apply {
             addProperty("name", "remember_fact")
             addProperty("description", "Stores a fact, preference, or habit into persistent long-term memory.")
@@ -232,10 +336,10 @@ class GeminiClient(
             })
         })
 
-        // 5. control_phone
+        // 8. control_phone
         funcArray.add(JsonObject().apply {
             addProperty("name", "control_phone")
-            addProperty("description", "Performs navigation and system actions on the phone.")
+            addProperty("description", "Performs navigation and system actions on the phone: HOME, BACK, RECENTS, NOTIFICATIONS, QUICK_SETTINGS, LOCK.")
             add("parameters", JsonObject().apply {
                 addProperty("type", "OBJECT")
                 add("properties", JsonObject().apply {
@@ -245,6 +349,22 @@ class GeminiClient(
                     })
                 })
                 add("required", JsonArray().apply { add("action") })
+            })
+        })
+
+        // 9. open_floating_bubble
+        funcArray.add(JsonObject().apply {
+            addProperty("name", "open_floating_bubble")
+            addProperty("description", "Opens or closes the draggable floating bubble companion on screen.")
+            add("parameters", JsonObject().apply {
+                addProperty("type", "OBJECT")
+                add("properties", JsonObject().apply {
+                    add("state", JsonObject().apply {
+                        addProperty("type", "STRING")
+                        addProperty("description", "start or stop")
+                    })
+                })
+                add("required", JsonArray().apply { add("state") })
             })
         })
 

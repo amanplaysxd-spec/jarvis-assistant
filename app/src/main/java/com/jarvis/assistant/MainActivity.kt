@@ -117,6 +117,17 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
             } else false
         }
 
+        binding.btnFloatingBubble.setOnClickListener {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
+                android.widget.Toast.makeText(this, "Enable 'Display over other apps' to use Floating Jarvis", android.widget.Toast.LENGTH_LONG).show()
+                val intent = Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName"))
+                startActivity(intent)
+            } else {
+                com.jarvis.assistant.services.FloatingBubbleService.start(this)
+                android.widget.Toast.makeText(this, "Floating 3D Jarvis activated!", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+
         binding.btnSettings.setOnClickListener {
             showSettingsDialog()
         }
@@ -183,10 +194,8 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
         binding.visualizerView.setState(listening = false, speaking = false)
 
         lifecycleScope.launch {
-            // Auto extract and memorize facts/habits from user speech
             memoryManager.autoLearnFromText(query)
 
-            // Inject stored long-term memory into prompt
             val memoryContext = memoryManager.buildMemoryContext()
             val systemPrompt = PromptTemplates.buildSystemPrompt(memoryContext)
 
@@ -216,6 +225,26 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
                     val message = youtubeTool.playOrSearch(ytQuery)
                     if (finalSpokenText.isBlank()) finalSpokenText = message
                 }
+                "upload_youtube_video" -> {
+                    val title = fnCall.args["title"] ?: "My Video"
+                    val desc = fnCall.args["description"] ?: "Uploaded with Jarvis AI"
+                    val message = youtubeTool.openUploadScreen(title, desc)
+                    if (finalSpokenText.isBlank()) finalSpokenText = message
+                }
+                "perform_gesture" -> {
+                    val dir = fnCall.args["direction"] ?: "up"
+                    val success = JarvisAccessibilityService.performSwipe(dir)
+                    if (finalSpokenText.isBlank()) {
+                        finalSpokenText = if (success) "Moving $dir for you, Boss!" else "Please enable Accessibility to control games."
+                    }
+                }
+                "click_screen_text" -> {
+                    val targetText = fnCall.args["text"] ?: ""
+                    val success = JarvisAccessibilityService.clickNodeByText(targetText)
+                    if (finalSpokenText.isBlank()) {
+                        finalSpokenText = if (success) "Tapped $targetText on screen, Boss." else "Could not find $targetText."
+                    }
+                }
                 "generate_image" -> {
                     val prompt = fnCall.args["prompt"] ?: ""
                     val message = imageGenTool.generateImage(prompt)
@@ -240,6 +269,22 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
                             "Executed $action for you, Boss."
                         } else {
                             "Boss, please enable Accessibility Service in Settings so I can navigate the phone."
+                        }
+                    }
+                }
+                "open_floating_bubble" -> {
+                    val state = fnCall.args["state"] ?: "start"
+                    if (state.equals("stop", ignoreCase = true)) {
+                        com.jarvis.assistant.services.FloatingBubbleService.stop(this)
+                        if (finalSpokenText.isBlank()) finalSpokenText = "Floating bubble closed, Boss."
+                    } else {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
+                            val intent = Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName"))
+                            startActivity(intent)
+                            finalSpokenText = "Please allow overlay permission so I can hover over your screen."
+                        } else {
+                            com.jarvis.assistant.services.FloatingBubbleService.start(this)
+                            if (finalSpokenText.isBlank()) finalSpokenText = "Floating 3D Jarvis is active on your screen, Boss."
                         }
                     }
                 }

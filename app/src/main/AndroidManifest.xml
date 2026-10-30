@@ -19,9 +19,9 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/avatar_anime"
+        android:icon="@drawable/channel_logo"
         android:label="@string/app_name"
-        android:roundIcon="@drawable/avatar_anime"
+        android:roundIcon="@drawable/channel_logo"
         android:supportsRtl="true"
         android:theme="@style/Theme.JarvisAssistant"
         android:usesCleartextTraffic="true">
@@ -39,7 +39,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Accessibility Service for full phone automation (Back, Home, Recents, Clicks) -->
+        <!-- Accessibility Service for full phone automation (Back, Home, Recents, Clicks, Gestures) -->
         <service
             android:name=".services.JarvisAccessibilityService"
             android:exported="true"
@@ -57,6 +57,11 @@
             android:name=".services.JarvisForegroundService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- Floating 3D Bubble Overlay Service -->
+        <service
+            android:name=".services.FloatingBubbleService"
+            android:exported="false" />
 
     </application>
 
