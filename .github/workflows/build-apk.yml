@@ -51,7 +51,7 @@ jobs:
             ### Features included in this build:
             - 🎙️ **Full Voice Interaction**: Speech-to-Text & Text-to-Speech in Hindi, Hinglish, and English.
             - 🧠 **Continuous Long-term Memory**: Remembers your habits, personal facts, and preferences across sessions.
-            - ⚡ **Gemini 2.0 / 1.5 Flash AI Engine**: Fast reasoning, intelligent dialogue, and tool calling.
+            - ⚡ **Gemini 3.8 Flash AI Engine**: Ultra-fast reasoning, multimodal intelligence, and function calling.
             - 📱 **Complete Phone Control**:
               - Opens Minecraft, ChatGPT, YouTube, Camera, WhatsApp, and any app by name.
               - Plays specific videos or music directly on YouTube.

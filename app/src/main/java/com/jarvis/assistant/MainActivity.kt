@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
 
     private fun initToolsAndEngines() {
         val apiKey = prefs.getString("gemini_api_key", "") ?: ""
-        val model = prefs.getString("gemini_model", "gemini-2.0-flash") ?: "gemini-2.0-flash"
+        val model = prefs.getString("gemini_model", "gemini-3.8-flash") ?: "gemini-3.8-flash"
 
         geminiClient = GeminiClient(apiKey, model)
         memoryManager = MemoryManager(this)
@@ -265,6 +265,7 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
 
         val etApiKey = view.findViewById<EditText>(R.id.etApiKey)
         val rgModel = view.findViewById<RadioGroup>(R.id.rgModel)
+        val rb38 = view.findViewById<RadioButton>(R.id.rbGemini38Flash)
         val rb2 = view.findViewById<RadioButton>(R.id.rbGemini2Flash)
         val rb15 = view.findViewById<RadioButton>(R.id.rbGemini15Flash)
         val btnAccessibility = view.findViewById<Button>(R.id.btnEnableAccessibility)
@@ -272,11 +273,11 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
         val btnCancel = view.findViewById<Button>(R.id.btnCancelSettings)
 
         etApiKey.setText(prefs.getString("gemini_api_key", ""))
-        val curModel = prefs.getString("gemini_model", "gemini-2.0-flash")
-        if (curModel == "gemini-1.5-flash") {
-            rb15.isChecked = true
-        } else {
-            rb2.isChecked = true
+        val curModel = prefs.getString("gemini_model", "gemini-3.8-flash")
+        when (curModel) {
+            "gemini-1.5-flash" -> rb15.isChecked = true
+            "gemini-2.0-flash" -> rb2.isChecked = true
+            else -> rb38.isChecked = true
         }
 
         btnAccessibility.setOnClickListener {
@@ -285,7 +286,11 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
 
         btnSave.setOnClickListener {
             val key = etApiKey.text.toString().trim()
-            val selectedModel = if (rb15.isChecked) "gemini-1.5-flash" else "gemini-2.0-flash"
+            val selectedModel = when {
+                rb15.isChecked -> "gemini-1.5-flash"
+                rb2.isChecked -> "gemini-2.0-flash"
+                else -> "gemini-3.8-flash"
+            }
 
             prefs.edit()
                 .putString("gemini_api_key", key)
@@ -295,7 +300,7 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
             geminiClient.updateApiKey(key)
             geminiClient.updateModel(selectedModel)
 
-            Toast.makeText(this, "Settings saved successfully!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Settings saved: using $selectedModel!", Toast.LENGTH_SHORT).show()
             dialog.dismiss()
         }
 

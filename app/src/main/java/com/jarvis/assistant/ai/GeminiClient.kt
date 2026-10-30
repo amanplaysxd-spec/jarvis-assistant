@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 class GeminiClient(
     private var apiKey: String,
-    private var model: String = "gemini-2.0-flash"
+    private var model: String = "gemini-3.8-flash"
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)

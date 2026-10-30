@@ -1,6 +1,6 @@
 # 🤖 Jarvis AI Assistant (Android Native APK)
 
-A full-fledged, voice-activated AI personal assistant for Android powered by **Google Gemini 2.0 Flash / 1.5 Flash**, equipped with **Continuous Long-term Memory**, **Phone Automation (Accessibility Service)**, **App Launcher**, **YouTube Player**, and an **Animated Anime Companion Avatar**.
+A full-fledged, voice-activated AI personal assistant for Android powered by **Google Gemini 3.8 Flash** (with fallback support for 2.0 & 1.5), equipped with **Continuous Long-term Memory**, **Phone Automation (Accessibility Service)**, **App Launcher**, **YouTube Player**, and an **Animated Anime Companion Avatar**.
 
 Inspired by [Aryan-0001/Jarvis-AI](https://github.com/Aryan-0001/Jarvis-AI) and [open-jarvis/OpenJarvis](https://github.com/open-jarvis/openjarvis).
 
