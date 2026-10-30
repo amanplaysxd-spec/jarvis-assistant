@@ -48,7 +48,7 @@ class MemoryManager(context: Context) {
      * Inspects user utterances in Hindi, Hinglish, and English to auto-extract facts
      * e.g., "Mera favorite game Minecraft hai", "Yaad rakhna mujhe Arijit ke gaane pasand hain"
      */
-    suspend fun autoLearnFromText(userText: String) = withContext(Dispatchers.IO) {
+    suspend fun autoLearnFromText(userText: String): Unit = withContext(Dispatchers.IO) {
         val lower = userText.lowercase(Locale.ROOT).trim()
 
         when {
@@ -74,6 +74,10 @@ class MemoryManager(context: Context) {
             lower.contains("favorite singer") || lower.contains("gaana pasand hai") -> {
                 saveFact("PREFERENCE", "music_taste", userText)
             }
+            else -> {
+                // No actionable pattern matched
+            }
         }
+        Unit
     }
 }

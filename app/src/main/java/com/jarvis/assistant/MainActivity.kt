@@ -243,6 +243,9 @@ class MainActivity : AppCompatActivity(), VoiceRecognizer.Listener {
                         }
                     }
                 }
+                else -> {
+                    // Unknown function call
+                }
             }
         }
 
