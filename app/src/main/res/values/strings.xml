@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Jarvis AI</string>
+    <string name="accessibility_service_description">Enables Jarvis AI Assistant to control your phone, navigate screens, press home/back, and launch games and apps via voice.</string>
+    
+    <string name="status_ready">Online and Ready, Boss</string>
+    <string name="status_listening">Listening to you...</string>
+    <string name="status_thinking">Processing with Gemini AI...</string>
+    <string name="status_speaking">Jarvis is speaking...</string>
+    <string name="status_error">Error occurred. Tap to retry.</string>
+    
+    <string name="btn_listen">Speak</string>
+    <string name="btn_send">Send</string>
+    <string name="hint_input">Talk to Jarvis or type here...</string>
+    <string name="title_settings">Jarvis AI Settings</string>
+    <string name="title_memory">Jarvis Memory Core</string>
+    <string name="api_key_hint">Enter Google Gemini API Key</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_clear_memory">Wipe All Memory</string>
+    <string name="empty_memory">No memories recorded yet. Talk with Jarvis and it will learn about you automatically!</string>
+</resources>

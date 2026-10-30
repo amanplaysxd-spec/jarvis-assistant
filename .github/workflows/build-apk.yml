@@ -1,0 +1,69 @@
+name: Build Jarvis AI Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Make Gradlew Executable
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-AI-Assistant-Debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+      - name: Create Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-build-${{ github.run_number }}
+          name: "Jarvis AI Assistant v1.0.0 (Build ${{ github.run_number }})"
+          body: |
+            ## 🚀 Jarvis AI Assistant Android Release
+
+            ### Features included in this build:
+            - 🎙️ **Full Voice Interaction**: Speech-to-Text & Text-to-Speech in Hindi, Hinglish, and English.
+            - 🧠 **Continuous Long-term Memory**: Remembers your habits, personal facts, and preferences across sessions.
+            - ⚡ **Gemini 2.0 / 1.5 Flash AI Engine**: Fast reasoning, intelligent dialogue, and tool calling.
+            - 📱 **Complete Phone Control**:
+              - Opens Minecraft, ChatGPT, YouTube, Camera, WhatsApp, and any app by name.
+              - Plays specific videos or music directly on YouTube.
+              - Full device navigation (Home, Back, Recents, Notifications).
+            - 🕶️ **Anime Companion Avatar**: Interactive animated character HUD with neon pulse sound visualizer.
+
+            ### How to Install:
+            1. Download the `.apk` file below.
+            2. Open on your Android phone and install.
+            3. Grant Microphone and Accessibility permissions for full phone control.
+          files: app/build/outputs/apk/debug/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
